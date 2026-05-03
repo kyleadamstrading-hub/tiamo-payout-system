@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>TiAmo Relaxation Spa Payout System</title>
+<script src="https://cdn.jsdelivr.net/npm/html2canvas"></script>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@500;700&family=Poppins:wght@300;400;600&display=swap" rel="stylesheet">
+<style>
+body{margin:0;font-family:Poppins,sans-serif;background:#000;color:#fff}
+.container{max-width:1000px;margin:auto;padding:30px;text-align:center;position:relative}
+h1,h2{font-family:'Playfair Display',serif;color:#d4af37}
+button{padding:12px 20px;margin:8px;border:none;border-radius:25px;background:#d4af37;color:#000;cursor:pointer;transition:.3s}
+button:hover{transform:translateY(-2px);box-shadow:0 5px 15px rgba(212,175,55,.4)}
+.card{
+background:#111;padding:20px;margin-top:20px;border-radius:15px;
+border:1px solid rgba(212,175,55,.2);
+position:relative;overflow:hidden;
+}
+.card:hover{
+box-shadow:0 0 30px rgba(212,175,55,.7);
+border:1px solid rgba(212,175,55,.8);
+}
+.hidden{display:none}
+input,select{padding:8px;margin:5px;border-radius:8px;border:none;background:#222;color:#fff}
+.section{border-top:1px solid #333;margin-top:15px;padding-top:10px}
+.funding-row { display:flex; flex-wrap:wrap; align-items:center; gap:8px; margin-bottom:8px; }
+.funding-row input, .funding-row select { flex:1; min-width:160px; }
+.remove-btn { background:#c0392b; color:white; padding:8px 12px; font-size:0.9em; }
+canvas.particles{position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none}
+.logo{width:120px;margin-bottom:10px}
+</style>
+</head>
+<body>
+<div class="container">
+<canvas class="particles" id="bgParticles"></canvas>
+<img src="https://via.placeholder.com/120x60?text=TiAmo" class="logo">
+<h1>TiAmo Payout System</h1>
+
+<div id="home">
+<button onclick="show('start')">Start Payout</button>
+<button onclick="showReports()">View All</button>
+</div>
+
+<div id="start" class="hidden">
+<button onclick="show('home')">⬅ Back</button>
+<h2>Select Type</h2>
+<button onclick="show('weekly')">Weekly</button>
+<button onclick="show('weekend')">Weekend</button>
+</div>
+
+<div id="weekly" class="hidden">
+<button onclick="show('start')">⬅ Back</button>
+<h2>Weekly Report (Mon - Thurs)</h2>
+<div id="days"></div>
+
+<!-- Ads, Penalties, Levy cards remain unchanged -->
+<div class="card">
+<h2>Ads</h2>
+<div class="items"></div>
+<button onclick="addItem(this)">+</button>
+</div>
+<div class="card">
+<h2>Penalties (Summary)</h2>
+<div class="items"></div>
+<button onclick="addItem(this)">+</button>
+</div>
+<div class="card">
+<h2>Levy</h2>
+<div class="items"></div>
+<button onclick="addItem(this)">+</button>
+</div>
+
+<button onclick="downloadPNG()">Download Premium PNG</button>
+</div>
+
+<div id="allReports" class="hidden"></div>
+</div>
+
+<script>
+const daysContainer = document.getElementById('days');
+const days = ["Monday","Tuesday","Wednesday","Thursday"];
+
+function addItem(btn){
+    const parent = btn.previousElementSibling;
+    const row = document.createElement('div');
+    row.innerHTML = `
+        <input placeholder="Name">
+        <input placeholder="Reason">
+        <input type="number" placeholder="Amount">
+    `;
+    parent.appendChild(row);
+}
+
+// ==================== MULTIPLE FUNDING SOURCES ====================
+function addFundingSource(btn){
+    const container = btn.previousElementSibling; // .funding-sources
+    const row = document.createElement('div');
+    row.className = 'funding-row';
+    row.innerHTML = `
+        <select onchange="toggleOther(this)">
+            <option value="Ewallet">Ewallet</option>
+            <option value="ATM">ATM</option>
+            <option value="Other">Other</option>
+        </select>
+        <input class="otherInput hidden" placeholder="Specify other source">
+        <input type="number" placeholder="Amount Added" style="width:140px">
+        <button class="remove-btn" onclick="this.parentElement.remove()">×</button>
+    `;
+    container.appendChild(row);
+}
+
+function toggleOther(select){
+    const otherInput = select.parentElement.querySelector('.otherInput');
+    if(select.value === "Other"){
+        otherInput.classList.remove('hidden');
+    } else {
+        otherInput.classList.add('hidden');
+    }
+}
+
+// ==================== CREATE DAY CARD ====================
+function createDay(day){
+    const div = document.createElement('div');
+    div.className = 'card';
+    div.innerHTML = `
+        <canvas class="particles"></canvas>
+        <h3>${day}</h3>
+        <input type="date">
+        
+        <div class="section">
+            <input type="number" placeholder="Capital Required">
+            <input type="number" placeholder="Envelope Funds">
+            <input type="number" placeholder="Shortage">
+        </div>
+
+        <!-- Multiple Funding Sources -->
+        <div class="section">
+            <h4>Funds Added (Multiple Sources)</h4>
+            <div class="funding-sources"></div>
+            <button onclick="addFundingSource(this)">+ Add Funding Source</button>
+        </div>
+
+        <div class="section">
+            <h4>Penalties</h4>
+            <div class="items"></div>
+            <button onclick="addItem(this)">+</button>
+        </div>
+    `;
+
+    // Add one default funding row
+    const fundingContainer = div.querySelector('.funding-sources');
+    const defaultRow = document.createElement('div');
+    defaultRow.className = 'funding-row';
+    defaultRow.innerHTML = `
+        <select onchange="toggleOther(this)">
+            <option value="Ewallet">Ewallet</option>
+            <option value="ATM">ATM</option>
+            <option value="Other">Other</option>
+        </select>
+        <input class="otherInput hidden" placeholder="Specify other source">
+        <input type="number" placeholder="Amount Added" style="width:140px">
+        <button class="remove-btn" onclick="this.parentElement.remove()">×</button>
+    `;
+    fundingContainer.appendChild(defaultRow);
+
+    setParticles(div.querySelector('canvas'), 40);
+    return div;
+}
+
+function setParticles(canvas, count){
+    const ctx = canvas.getContext('2d');
+    let particles = [];
+    for(let i = 0; i < count; i++){
+        particles.push({x:Math.random()*canvas.offsetWidth, y:Math.random()*canvas.offsetHeight, r:Math.random()*2});
+    }
+    function animate(){
+        canvas.width = canvas.offsetWidth;
+        canvas.height = canvas.offsetHeight;
+        ctx.clearRect(0,0,canvas.width,canvas.height);
+        particles.forEach(p => {
+            p.y -= 0.5;
+            if(p.y < 0) p.y = canvas.height;
+            ctx.beginPath();
+            ctx.arc(p.x, p.y, p.r, 0, Math.PI*2);
+            ctx.fillStyle = 'rgba(212,175,55,0.4)';
+            ctx.fill();
+        });
+        requestAnimationFrame(animate);
+    }
+    animate();
+}
+
+// Background particles
+setParticles(document.getElementById('bgParticles'), 80);
+
+// Build days
+days.forEach(d => daysContainer.appendChild(createDay(d)));
+
+function show(id){
+    document.querySelectorAll('.container > div').forEach(d => d.classList.add('hidden'));
+    document.getElementById(id).classList.remove('hidden');
+}
+
+function downloadPNG(){
+    html2canvas(document.body, {scale: 2}).then(canvas => {
+        const link = document.createElement('a');
+        link.download = 'tiamo-weekly-report.png';
+        link.href = canvas.toDataURL('image/png');
+        link.click();
+    });
+}
+
+function showReports(){
+    const c = document.getElementById('allReports');
+    c.innerHTML = '<h2>All Reports (Feature Coming Soon)</h2>';
+    show('allReports');
+}
+</script>
+</body>
+</html>
