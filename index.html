@@ -24,7 +24,8 @@ input,select{padding:8px;margin:5px;border-radius:8px;border:none;background:#22
 .funding-row input, .funding-row select { flex:1; min-width:160px; }
 .remove-btn { background:#c0392b; color:white; padding:8px 12px; font-size:0.9em; }
 .currency::before { content: "R "; font-weight: bold; }
-.summary-total { font-size:1.3em; color:#d4af37; font-weight:bold; margin:15px 0; }
+.summary-total { font-size:1.4em; color:#d4af37; font-weight:bold; margin:15px 0; }
+.date-header { font-size:1.1em; color:#aaa; margin-bottom:15px; }
 canvas.particles{position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none}
 .logo{width:120px;margin-bottom:10px}
 </style>
@@ -52,7 +53,6 @@ canvas.particles{position:absolute;top:0;left:0;width:100%;height:100%;pointer-e
 <h2>Weekly Report (Mon - Thurs)</h2>
 <div id="days"></div>
 
-<!-- Global Sections -->
 <div class="card">
 <h2>Ads</h2>
 <div class="items"></div>
@@ -71,13 +71,14 @@ canvas.particles{position:absolute;top:0;left:0;width:100%;height:100%;pointer-e
 <button onclick="addItem(this)">+</button>
 </div>
 
-<!-- Auto Summary -->
-<div class="card">
+<!-- Overall Summary -->
+<div class="card" id="summary-card">
 <h2>Overall Summary</h2>
+<div id="date-header" class="date-header"></div>
 <div id="summary" class="section"></div>
 </div>
 
-<button onclick="downloadPNG()">Download Premium PNG</button>
+<button onclick="downloadSummaryPNG()">📸 Download Summary PNG</button>
 </div>
 
 <div id="allReports" class="hidden"></div>
@@ -87,6 +88,7 @@ canvas.particles{position:absolute;top:0;left:0;width:100%;height:100%;pointer-e
 const daysContainer = document.getElementById('days');
 const days = ["Monday","Tuesday","Wednesday","Thursday"];
 
+// Add item (Ads, Penalties, Levy)
 function addItem(btn){
     const parent = btn.previousElementSibling;
     const row = document.createElement('div');
@@ -99,7 +101,7 @@ function addItem(btn){
     parent.appendChild(row);
 }
 
-// Multiple Funding Sources
+// Funding Sources
 function addFundingSource(btn){
     const container = btn.previousElementSibling;
     const row = document.createElement('div');
@@ -123,7 +125,7 @@ function toggleOther(select){
     else otherInput.classList.add('hidden');
 }
 
-// Create Day Card
+// Create Day
 function createDay(day){
     const div = document.createElement('div');
     div.className = 'card';
@@ -145,7 +147,6 @@ function createDay(day){
             <input type="number" class="amount-input" placeholder="R 0.00" oninput="calculateSummary()">
         </div>
 
-        <!-- Multiple Funding Sources -->
         <div class="section">
             <h4>Funds Added (Multiple Sources)</h4>
             <div class="funding-sources"></div>
@@ -153,7 +154,6 @@ function createDay(day){
         </div>
     `;
 
-    // Add default funding row
     const fundingContainer = div.querySelector('.funding-sources');
     const defaultRow = document.createElement('div');
     defaultRow.className = 'funding-row';
@@ -173,7 +173,7 @@ function createDay(day){
     return div;
 }
 
-function setParticles(canvas, count){ /* unchanged */ 
+function setParticles(canvas, count){ /* same as before */ 
     const ctx = canvas.getContext('2d');
     let particles = [];
     for(let i = 0; i < count; i++){
@@ -196,38 +196,37 @@ function setParticles(canvas, count){ /* unchanged */
     animate();
 }
 
-// Background particles
+// Background
 setParticles(document.getElementById('bgParticles'), 80);
-
-// Build days
 days.forEach(d => daysContainer.appendChild(createDay(d)));
 
-// Auto Summary Calculation
+// Auto Summary + Date
 function calculateSummary(){
+    const now = new Date();
+    const dateStr = now.toLocaleDateString('en-ZA', { weekday:'long', year:'numeric', month:'long', day:'numeric' });
+    document.getElementById('date-header').innerHTML = `<strong>Report Date:</strong> ${dateStr}`;
+
     let totalNeeded = 0, totalEnvelope = 0, totalShort = 0;
     let totalFundsAdded = 0;
     let totalPenalties = 0;
 
-    // Day fields
+    // Day inputs
     document.querySelectorAll('#days .amount-input').forEach(input => {
         const val = parseFloat(input.value) || 0;
-        // Simple heuristic: first amount = needed, second = envelope, third = short
-        const section = input.closest('.section');
-        if(section && section.previousElementSibling && section.previousElementSibling.textContent.includes("therapists")){
-            totalNeeded += val;
-        } else if(section && section.textContent.includes("envelope")){
-            totalEnvelope += val;
-        } else if(section && section.textContent.includes("short")){
-            totalShort += val;
+        const label = input.closest('.section').querySelector('label');
+        if(label){
+            if(label.textContent.includes("therapists")) totalNeeded += val;
+            else if(label.textContent.includes("envelope")) totalEnvelope += val;
+            else if(label.textContent.includes("short")) totalShort += val;
         }
     });
 
     // Funds Added
-    document.querySelectorAll('.amount-input').forEach(input => {
-        if(input.closest('.funding-row')) totalFundsAdded += parseFloat(input.value) || 0;
+    document.querySelectorAll('.funding-row .amount-input').forEach(input => {
+        totalFundsAdded += parseFloat(input.value) || 0;
     });
 
-    // Penalties + Ads + Levy
+    // All Penalties + Ads + Levy
     document.querySelectorAll('.items .amount-input').forEach(input => {
         totalPenalties += parseFloat(input.value) || 0;
     });
@@ -237,24 +236,27 @@ function calculateSummary(){
         <p><strong>Total Counted in Envelopes:</strong> <span class="currency">${totalEnvelope.toFixed(2)}</span></p>
         <p><strong>Total Shortage:</strong> <span class="currency">${totalShort.toFixed(2)}</span></p>
         <p><strong>Total Funds Added:</strong> <span class="currency">${totalFundsAdded.toFixed(2)}</span></p>
-        <p class="summary-total">Grand Total (Penalties + Ads + Levy): <span class="currency">${totalPenalties.toFixed(2)}</span></p>
+        <p><strong>Total Penalties (Ads + Penalties + Levy):</strong> <span class="currency">${totalPenalties.toFixed(2)}</span></p>
+        <p class="summary-total">Grand Total: <span class="currency">${totalPenalties.toFixed(2)}</span></p>
     `;
     document.getElementById('summary').innerHTML = summaryHTML;
+}
+
+// Download ONLY the Summary Card as PNG
+function downloadSummaryPNG(){
+    const summaryCard = document.getElementById('summary-card');
+    html2canvas(summaryCard, {scale: 2, backgroundColor: '#111'}).then(canvas => {
+        const link = document.createElement('a');
+        link.download = `tiamo-summary-${new Date().toISOString().slice(0,10)}.png`;
+        link.href = canvas.toDataURL('image/png');
+        link.click();
+    });
 }
 
 function show(id){
     document.querySelectorAll('.container > div').forEach(d => d.classList.add('hidden'));
     document.getElementById(id).classList.remove('hidden');
     if(id === 'weekly') calculateSummary();
-}
-
-function downloadPNG(){
-    html2canvas(document.body, {scale: 2}).then(canvas => {
-        const link = document.createElement('a');
-        link.download = 'tiamo-weekly-report.png';
-        link.href = canvas.toDataURL('image/png');
-        link.click();
-    });
 }
 
 function showReports(){
